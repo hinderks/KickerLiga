@@ -1,0 +1,15 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "model": "openrouter/qwen/qwen3.8-27b",
+  "provider": {
+    "openrouter": {
+      "models": {
+        "qwen/qwen3.8-27b": {
+          "options": {
+            "provider": { "order": ["Alibaba"], "allow_fallbacks": false }
+          }
+        }
+      }
+    }
+  }
+}

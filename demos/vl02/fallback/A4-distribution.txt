@@ -1,0 +1,21 @@
+--- answer (qwen/qwen3-coder via Google) ---
+```typescript
+const K_FACTOR = 32;
+```
+
+--- tokens --- in: 21  out: 13  (of which reasoning: 0)
+--- cost --- 0.000028 USD for this call
+
+--- first 12 output tokens with alternatives ---
+"```"            <- "```" 99.4%   "const" 0.3%   "3" 0.3%   "``" 0.0%   "1" 0.0%
+"typescript"     <- "typescript" 100.0%   "ts" 0.0%   "javascript" 0.0%   " types" 0.0%   "tsx" 0.0%
+"\n"             <- "\n" 100.0%   "<|im_end|>" 0.0%   " const" 0.0%   "const" 0.0%   "\r\n" 0.0%
+"const"          <- "\n" 100.0%   "<|im_end|>" 0.0%   " const" 0.0%   "const" 0.0%   "\r\n" 0.0%
+" K"             <- "\n" 100.0%   "<|im_end|>" 0.0%   " const" 0.0%   "const" 0.0%   "\r\n" 0.0%
+"_FACTOR"        <- "\n" 100.0%   "<|im_end|>" 0.0%   " const" 0.0%   "const" 0.0%   "\r\n" 0.0%
+" ="             <- " =" 100.0%   " =\n" 0.0%   ":" 0.0%   "\n" 0.0%   ";\n" 0.0%
+" "              <- " =" 100.0%   " =\n" 0.0%   ":" 0.0%   "\n" 0.0%   ";\n" 0.0%
+"3"              <- " =" 100.0%   " =\n" 0.0%   ":" 0.0%   "\n" 0.0%   ";\n" 0.0%
+"2"              <- " =" 100.0%   " =\n" 0.0%   ":" 0.0%   "\n" 0.0%   ";\n" 0.0%
+";\n"            <- ";\n" 100.0%   "\n" 0.0%   ";" 0.0%   " as" 0.0%   ":\n" 0.0%
+"```"            <- "```" 100.0%   "``" 0.0%   "`" 0.0%   " ```" 0.0%   "<|im_end|>" 0.0%
