@@ -20,7 +20,7 @@ record_match_and_update_elo
 --- first 12 output tokens with alternatives ---
 "record"         <- "record" 88.1%   "`" 11.9%   "update" 0.0%   "Record" 0.0%   "Update" 0.0%
 "_match"         <- "_match" 64.4%   "Fo" 14.4%   "Match" 11.2%   "_table" 5.3%   "Table" 4.1%
-"_and"           <- "_and" 99.9%   "AndUpdate" 0.1%   "_update" 0.0%   "_with" 0.0%   "<|im_end|>" 0.0%
-"_update"        <- "_update" 100.0%   "_cal" 0.0%   "_rate" 0.0%   "_rating" 0.0%   "-update" 0.0%
-"_"              <- "_" 99.7%   "_ratings" 0.3%   "_el" 0.0%   "_rating" 0.0%   "_rank" 0.0%
-"elo"            <- "elo" 100.0%   " elo" 0.0%   "ela" 0.0%   "ell" 0.0%   "eli" 0.0%
+"_and"           <- "_and" 99.9%   "AndUpdate" 0.1%   "_update" 0.1%   "_with" 0.0%   "<|im_end|>" 0.0%
+"_update"        <- "_update" 100.0%   "_cal" 0.0%   "-update" 0.0%   "_udp" 0.0%   "_rate" 0.0%
+"_"              <- "_" 99.5%   "_ratings" 0.5%   "_el" 0.0%   "_rating" 0.0%   "_rank" 0.0%
+"elo"            <- "elo" 100.0%   " elo" 0.0%   "ela" 0.0%   "ell" 0.0%   "els" 0.0%
