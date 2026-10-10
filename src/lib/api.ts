@@ -1,4 +1,4 @@
-import { INITIAL_ELO } from './elo'
+const INITIAL_ELO = 1500
 import { supabase } from './supabase'
 import type { Match, Player } from './types'
 
