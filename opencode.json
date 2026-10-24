@@ -6,10 +6,18 @@
       "models": {
         "qwen/qwen3.8-27b": {
           "options": {
-            "provider": { "order": ["Alibaba"], "allow_fallbacks": false }
+            "provider": {
+              "order": [
+                "Alibaba"
+              ],
+              "allow_fallbacks": false
+            }
           }
         }
       }
     }
+  },
+  "permission": {
+    "describe_table": "allow"
   }
 }
