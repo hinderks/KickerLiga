@@ -1,0 +1,26 @@
+diff --git a/src/lib/api.ts b/src/lib/api.ts
+index 1b1c18a..b3db496 100644
+--- a/src/lib/api.ts
++++ b/src/lib/api.ts
+@@ -81,3 +81,18 @@ export async function closeSeason(seasonId: string, nextName: string): Promise<S
+   if (!data) throw new Error('Could not close the season.')
+   return data as Season
+ }
++
++export async function renamePlayer(playerId: string, newName: string): Promise<Player> {
++  const name = newName.trim()
++  if (!name) throw new Error('Enter a player name.')
++
++  const { data, error } = await supabase
++    .from('kl_players')
++    .update({ name })
++    .eq('id', playerId)
++    .select()
++    .single()
++
++  if (error) throw new Error(messageFor(error, 'Could not rename player.'))
++  return data
++}
+diff --git a/src/lib/stats.test.ts b/src/lib/stats.test.ts
+new file mode 100644
+index 0000000..e69de29

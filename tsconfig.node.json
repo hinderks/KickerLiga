@@ -19,5 +19,5 @@
     "erasableSyntaxOnly": true,
     "noFallthroughCasesInSwitch": true
   },
-  "include": ["vite.config.ts", "vitest.acceptance.config.ts", "scripts/demo-db.ts", "scripts/reset-demo-db.ts"]
+  "include": ["vite.config.ts", "vitest.acceptance.config.ts", "scripts/demo-db.ts", "scripts/reset-demo-db.ts", "evals/run.ts", "evals/tasks.ts"]
 }

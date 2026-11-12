@@ -28,3 +28,6 @@ dist-ssr
 .env.*
 !.env.example
 !.env.demo.example
+
+# Eval runs: raw logs and session exports (results/ is kept)
+evals/runs/

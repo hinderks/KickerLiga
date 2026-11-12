@@ -12,7 +12,8 @@
     "test:acceptance": "vitest run --config vitest.acceptance.config.ts",
     "test:watch": "vitest",
     "preview": "vite preview",
-    "demo:reset": "tsx scripts/reset-demo-db.ts"
+    "demo:reset": "tsx scripts/reset-demo-db.ts",
+    "eval": "tsx evals/run.ts"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.116.0",
