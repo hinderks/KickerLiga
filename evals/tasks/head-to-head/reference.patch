@@ -18,9 +18,6 @@ index 1b1c18a..596f135 100644
 +  if (error) throw new Error(messageFor(error, 'Could not load head-to-head.'))
 +  return data as HeadToHead
 +}
-diff --git a/src/lib/stats.test.ts b/src/lib/stats.test.ts
-new file mode 100644
-index 0000000..e69de29
 diff --git a/supabase/migrations/0003_head_to_head.sql b/supabase/migrations/0003_head_to_head.sql
 new file mode 100644
 index 0000000..1aafbf0

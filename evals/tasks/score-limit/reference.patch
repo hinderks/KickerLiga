@@ -32,12 +32,6 @@ index 1b1c18a..02395e6 100644
    }
  
    const { data, error } = await supabase.rpc('kl_record_match', {
-diff --git a/src/lib/stats.test.ts b/src/lib/stats.test.ts
-new file mode 100644
-index 0000000..e69de29
-diff --git a/supabase/migrations/0003_head_to_head.sql b/supabase/migrations/0003_head_to_head.sql
-new file mode 100644
-index 0000000..e69de29
 diff --git a/supabase/migrations/0003_score_limit.sql b/supabase/migrations/0003_score_limit.sql
 new file mode 100644
 index 0000000..b664dab
@@ -120,6 +114,3 @@ index 0000000..b664dab
 +  return result;
 +end;
 +$$;
-diff --git a/supabase/migrations/0003_undo_last_match.sql b/supabase/migrations/0003_undo_last_match.sql
-new file mode 100644
-index 0000000..e69de29
