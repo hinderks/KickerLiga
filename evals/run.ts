@@ -93,7 +93,8 @@ function run(
 ): Promise<{ code: number; output: string }> {
   return new Promise((resolve) => {
     let output = ''
-    const child = spawn(cmd, args, { cwd, env, stdio: ['ignore', 'pipe', 'pipe'] })
+    // PWD as well: opencode takes its project root from PWD before the cwd.
+    const child = spawn(cmd, args, { cwd, env: { ...env, PWD: cwd }, stdio: ['ignore', 'pipe', 'pipe'] })
     child.stdout.on('data', (chunk) => (output += chunk))
     child.stderr.on('data', (chunk) => (output += chunk))
     child.on('error', (error) => resolve({ code: -1, output: error.message }))
@@ -245,11 +246,13 @@ type AgentRun = { sessionId: string; children: string[]; exit: string; minutes: 
 
 function runAgent(task: EvalTask, dir: string, opts: Options, logFile: string): Promise<AgentRun> {
   const prompt = readFileSync(path.join(ROOT, 'evals', 'tasks', task.id, 'prompt.md'), 'utf8')
-  const args = ['run', '--format', 'json']
+  // --dir and PWD: opencode run takes its project root from PWD, not from the
+  // cwd, and would otherwise work in the repository the runner was started from.
+  const args = ['run', '--format', 'json', '--dir', dir]
   if (opts.model) args.push('--model', opts.model)
   args.push(prompt)
 
-  const env: NodeJS.ProcessEnv = { ...process.env, OPENCODE_DISABLE_AUTOUPDATE: '1' }
+  const env: NodeJS.ProcessEnv = { ...process.env, PWD: dir, OPENCODE_DISABLE_AUTOUPDATE: '1' }
   // Headless, "ask" is rejected. --bash allow turns bash "*" into "allow" for the
   // sandbox only; explicit deny rules of the harness still win.
   if (opts.bash === 'allow') env.OPENCODE_PERMISSION = JSON.stringify({ bash: { '*': 'allow' } })
