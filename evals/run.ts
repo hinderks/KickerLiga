@@ -93,7 +93,7 @@ function run(
 ): Promise<{ code: number; output: string }> {
   return new Promise((resolve) => {
     let output = ''
-    const child = spawn(cmd, args, { cwd, env })
+    const child = spawn(cmd, args, { cwd, env, stdio: ['ignore', 'pipe', 'pipe'] })
     child.stdout.on('data', (chunk) => (output += chunk))
     child.stderr.on('data', (chunk) => (output += chunk))
     child.on('error', (error) => resolve({ code: -1, output: error.message }))
@@ -261,7 +261,8 @@ function runAgent(task: EvalTask, dir: string, opts: Options, logFile: string): 
     const children = new Set<string>()
     let buffer = ''
     let timedOut = false
-    const child = spawn('opencode', args, { cwd: dir, env, detached: true })
+    // stdin closed: opencode run reads piped stdin until EOF and would wait forever.
+    const child = spawn('opencode', args, { cwd: dir, env, detached: true, stdio: ['ignore', 'pipe', 'pipe'] })
 
     const onLine = (line: string) => {
       if (!line.trim()) return
