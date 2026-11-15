@@ -20,11 +20,13 @@
 
 import { execFileSync, spawn } from 'node:child_process'
 import {
+  closeSync,
   copyFileSync,
   createWriteStream,
   existsSync,
   mkdirSync,
   mkdtempSync,
+  openSync,
   readFileSync,
   rmSync,
   symlinkSync,
@@ -323,17 +325,38 @@ function emptyUsage(): Usage {
   return { steps: 0, toolCalls: 0, compactions: 0, sessions: 0, input: 0, output: 0, reasoning: 0, cacheRead: 0, cacheWrite: 0, cost: 0 }
 }
 
+function exportTo(dir: string, id: string, file: string): Promise<void> {
+  return new Promise((resolve) => {
+    const fd = openSync(file, 'w')
+    const child = spawn('opencode', ['export', id], {
+      cwd: dir,
+      env: { ...process.env, PWD: dir },
+      stdio: ['ignore', fd, 'ignore'],
+    })
+    const done = () => {
+      closeSync(fd)
+      resolve()
+    }
+    child.on('error', done)
+    child.on('close', done)
+  })
+}
+
 async function usage(dir: string, sessions: string[], logDir: string, label: string): Promise<Usage> {
   const total = emptyUsage()
   for (const id of sessions.filter(Boolean)) {
-    const result = await run('opencode', ['export', id], dir)
-    writeFileSync(path.join(logDir, `${label}-export-${id}.json`), result.output)
-    const start = result.output.indexOf('{')
+    // stdout goes straight into a file: through a pipe, opencode export cuts
+    // its output off at about 64 KB when it exits.
+    const file = path.join(logDir, `${label}-export-${id}.json`)
+    await exportTo(dir, id, file)
+    const text = readFileSync(file, 'utf8')
+    const start = text.indexOf('{')
     if (start < 0) continue
     let data: { messages?: { parts?: ExportPart[] }[] }
     try {
-      data = JSON.parse(result.output.slice(start))
+      data = JSON.parse(text.slice(start))
     } catch {
+      console.warn(`     could not parse ${path.relative(ROOT, file)}`)
       continue
     }
     total.sessions += 1
