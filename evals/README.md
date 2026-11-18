@@ -4,6 +4,9 @@ Eight KickerLiga tasks, from a one-liner to a feature, and a runner that starts 
 on each of them, n times, and records whether the result passes, what it cost and how long it took.
 Use it to compare two harness variants with the same model, tasks and budget.
 
+The reference measurement of lecture 8 (design, setup, results, limits) is described in
+`evals/README-reference-measurement.md`.
+
 ## Tasks
 
 | Task | Size | Start | Check |
