@@ -28,6 +28,14 @@ all green, that is the technical and functional part of the definition of done i
 
 ## Running
 
+After cloning, create local branches for the refs the runner uses (start states and harness
+variants); `git archive` does not resolve `origin/...` by the short name:
+
+    git fetch origin
+    git branch vl07 origin/vl07
+    git branch vl08-long origin/vl08-long
+    git switch vl08
+
 Prerequisites as for the lecture 7 demo: `.env.demo` with the demo project, Supabase CLI on PATH,
 OpenCode on PATH (pinned version), `npm install`.
 

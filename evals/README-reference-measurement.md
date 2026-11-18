@@ -195,16 +195,29 @@ two further components of `vl08-long` (compaction hook, subagent) one at a time.
 
 ## 10. Reproduce
 
+After cloning, create local branches for the refs the runner uses (start states and harness
+variants); `git archive` does not resolve `origin/...` by the short name:
+
+    git fetch origin
+    git branch vl07 origin/vl07
+    git branch vl08-long origin/vl08-long
+    git switch vl08
+
+Then:
+
 ```
-git switch vl08
 npm run eval -- --self-test
 export OPENCODE_CONFIG_CONTENT='{"provider":{"openrouter":{"models":{"qwen/qwen3.8-27b":{"limit":{"context":80000,"output":8192}}}}}}'
 npm run eval -- --harness vl08 --runs 2 --bash allow
 npm run eval -- --harness vl08-long~2 --runs 2 --bash allow
 ```
 
-Prerequisites: `.env.demo` with a separate Supabase demo project, Supabase CLI, OpenCode on the
-PATH with an OpenRouter key, `npm install`.
+Prerequisites: `.env.demo` with a separate Supabase demo project (copy `.env.demo.example`; never the
+course project), Supabase CLI, OpenCode on the PATH with an OpenRouter key, `npm install`.
+
+Raw logs and session exports go to `evals/runs/`, which git ignores. Do not publish them unchanged:
+with `--bash allow` they can contain the content of `.env.demo`. To share a session, use
+`opencode export --sanitize <session>`.
 
 ## Source
 
