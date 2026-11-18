@@ -1,0 +1,8 @@
+# Minimal Supabase CLI configuration for the lecture 7 demo tools.
+# Only used by `supabase db push` and `supabase db reset` with --db-url;
+# there is no local Supabase stack.
+project_id = "kickerliga"
+
+[db.seed]
+enabled = true
+sql_paths = ["./seed.sql"]

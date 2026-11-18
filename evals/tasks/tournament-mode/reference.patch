@@ -1,0 +1,679 @@
+diff --git a/CHANGELOG.md b/CHANGELOG.md
+index 061eca4..815f972 100644
+--- a/CHANGELOG.md
++++ b/CHANGELOG.md
+@@ -5,6 +5,7 @@ starting with Added, Changed or Fixed and naming the spec or file it concerns.
+ 
+ ## Unreleased
+ 
++- Added: tournament mode (`specs/tournament-mode.md`): migration `0003_tournaments.sql`, tournament functions in `src/lib/api.ts`, `src/lib/bracket.ts`, bracket in the UI.
+ - Added: eval set with eight tasks and runner `npm run eval` (`evals/`).
+ - Added: acceptance tests for `specs/tournament-mode.md` (AC1 to AC10) against the demo database.
+ - Added: seasons and season close (`specs/season-close.md`): migration `0002_seasons.sql`, `closeSeason` in `src/lib/api.ts`.
+diff --git a/src/App.tsx b/src/App.tsx
+index a387b62..671a778 100644
+--- a/src/App.tsx
++++ b/src/App.tsx
+@@ -1,13 +1,15 @@
+ import { useLoaderData, useRevalidator } from 'react-router-dom'
+ import { AddPlayerForm } from './components/AddPlayerForm'
++import { CreateTournamentForm } from './components/CreateTournamentForm'
+ import { Ranking } from './components/Ranking'
+ import { RecentMatches } from './components/RecentMatches'
+ import { RecordMatchForm } from './components/RecordMatchForm'
+-import { addPlayer, recordMatch } from './lib/api'
++import { TournamentBracket } from './components/TournamentBracket'
++import { addPlayer, createTournament, playTournamentMatch, recordMatch } from './lib/api'
+ import type { LeagueData } from './lib/league'
+ 
+ export default function App() {
+-  const { players, matches } = useLoaderData() as LeagueData
++  const { players, matches, tournament, bracket } = useLoaderData() as LeagueData
+   const revalidator = useRevalidator()
+ 
+   async function handleAdd(name: string) {
+@@ -20,6 +22,16 @@ export default function App() {
+     await revalidator.revalidate()
+   }
+ 
++  async function handleCreateTournament(name: string, playerIds: string[]) {
++    await createTournament(name, playerIds)
++    await revalidator.revalidate()
++  }
++
++  async function handlePlay(matchId: string, score1: number, score2: number) {
++    await playTournamentMatch(matchId, score1, score2)
++    await revalidator.revalidate()
++  }
++
+   return (
+     <div className="min-h-dvh bg-felt-950 text-cream">
+       <div className="pointer-events-none absolute inset-x-0 top-0 h-72 bg-[radial-gradient(ellipse_at_top,_rgba(201,162,39,0.14),_transparent_60%)]" />
+@@ -49,6 +61,18 @@ export default function App() {
+             </section>
+           </div>
+ 
++          <section className="rounded-2xl border border-white/10 bg-felt-900/80 p-5 lg:col-span-2">
++            <h2 className="mb-4 text-xs font-semibold uppercase tracking-wider text-gold">Tournament</h2>
++            <div className="grid gap-6 lg:grid-cols-[1fr_18rem]">
++              {tournament ? (
++                <TournamentBracket tournament={tournament} bracket={bracket} players={players} onPlay={handlePlay} />
++              ) : (
++                <p className="text-sm text-felt-50/60">No tournament yet. Pick players to start one.</p>
++              )}
++              <CreateTournamentForm players={players} onCreate={handleCreateTournament} />
++            </div>
++          </section>
++
+           <section className="rounded-2xl border border-white/10 bg-felt-900/80 p-5 lg:col-span-2">
+             <h2 className="mb-4 text-xs font-semibold uppercase tracking-wider text-gold">Recent matches</h2>
+             <RecentMatches players={players} matches={matches} />
+diff --git a/src/components/CreateTournamentForm.tsx b/src/components/CreateTournamentForm.tsx
+new file mode 100644
+index 0000000..a7cdbb3
+--- /dev/null
++++ b/src/components/CreateTournamentForm.tsx
+@@ -0,0 +1,67 @@
++import { Trophy } from 'lucide-react'
++import { useState, type FormEvent } from 'react'
++import type { Player } from '../lib/types'
++
++type Props = {
++  players: Player[]
++  onCreate: (name: string, playerIds: string[]) => Promise<void>
++}
++
++export function CreateTournamentForm({ players, onCreate }: Props) {
++  const [name, setName] = useState('')
++  const [selected, setSelected] = useState<string[]>([])
++  const [pending, setPending] = useState(false)
++  const [error, setError] = useState<string | null>(null)
++
++  function toggle(id: string) {
++    setSelected((ids) => (ids.includes(id) ? ids.filter((x) => x !== id) : [...ids, id]))
++  }
++
++  async function handleSubmit(event: FormEvent) {
++    event.preventDefault()
++    setPending(true)
++    setError(null)
++    try {
++      await onCreate(name, selected)
++      setName('')
++      setSelected([])
++    } catch (err) {
++      setError(err instanceof Error ? err.message : 'Could not create the tournament.')
++    } finally {
++      setPending(false)
++    }
++  }
++
++  return (
++    <form onSubmit={(event) => void handleSubmit(event)} className="space-y-3">
++      <label className="block text-xs font-semibold uppercase tracking-wider text-felt-50/70">
++        Name
++        <input
++          value={name}
++          onChange={(event) => setName(event.target.value)}
++          className="mt-1.5 w-full rounded-lg border border-white/10 bg-felt-950/60 px-3 py-2 text-sm text-cream outline-none focus:border-gold/70"
++        />
++      </label>
++      <fieldset className="grid grid-cols-2 gap-1.5 text-sm">
++        <legend className="mb-1.5 text-xs font-semibold uppercase tracking-wider text-felt-50/70">
++          Players ({selected.length})
++        </legend>
++        {players.map((player) => (
++          <label key={player.id} className="flex items-center gap-2 text-cream">
++            <input type="checkbox" checked={selected.includes(player.id)} onChange={() => toggle(player.id)} />
++            {player.name}
++          </label>
++        ))}
++      </fieldset>
++      {error ? <p className="text-sm text-rod-red">{error}</p> : null}
++      <button
++        type="submit"
++        disabled={pending || !name.trim() || selected.length < 2}
++        className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-cream px-3 py-2 text-sm font-semibold text-felt-950 disabled:opacity-50"
++      >
++        <Trophy size={16} />
++        {pending ? 'Creating…' : 'Create tournament'}
++      </button>
++    </form>
++  )
++}
+diff --git a/src/components/TournamentBracket.tsx b/src/components/TournamentBracket.tsx
+new file mode 100644
+index 0000000..617a528
+--- /dev/null
++++ b/src/components/TournamentBracket.tsx
+@@ -0,0 +1,91 @@
++import { Crown } from 'lucide-react'
++import { useState, type FormEvent } from 'react'
++import { roundCount, roundLabel } from '../lib/bracket'
++import type { Player, Tournament, TournamentMatch } from '../lib/types'
++
++type Props = {
++  tournament: Tournament
++  bracket: TournamentMatch[]
++  players: Player[]
++  onPlay: (matchId: string, score1: number, score2: number) => Promise<void>
++}
++
++export function TournamentBracket({ tournament, bracket, players, onPlay }: Props) {
++  const rounds = roundCount(tournament.size)
++  const nameOf = (id: string | null) => players.find((p) => p.id === id)?.name ?? null
++  const champion = nameOf(tournament.champion_id)
++
++  return (
++    <div className="space-y-4">
++      <div className="flex items-baseline justify-between gap-3">
++        <p className="font-display text-2xl tracking-wide text-cream">{tournament.name}</p>
++        {champion ? (
++          <p className="inline-flex items-center gap-1.5 text-sm font-semibold text-gold">
++            <Crown size={16} /> {champion}
++          </p>
++        ) : null}
++      </div>
++      <div className="grid gap-4 overflow-x-auto" style={{ gridTemplateColumns: `repeat(${rounds}, minmax(12rem, 1fr))` }}>
++        {Array.from({ length: rounds }, (_, i) => i + 1).map((round) => (
++          <div key={round} className="flex flex-col justify-around gap-3">
++            <p className="text-xs font-semibold uppercase tracking-wider text-felt-50/60">
++              {roundLabel(round, rounds)}
++            </p>
++            {bracket
++              .filter((m) => m.round === round)
++              .map((match) => (
++                <BracketMatch key={match.id} match={match} nameOf={nameOf} onPlay={onPlay} />
++              ))}
++          </div>
++        ))}
++      </div>
++    </div>
++  )
++}
++
++type MatchProps = {
++  match: TournamentMatch
++  nameOf: (id: string | null) => string | null
++  onPlay: Props['onPlay']
++}
++
++function BracketMatch({ match, nameOf, onPlay }: MatchProps) {
++  const [score1, setScore1] = useState('')
++  const [score2, setScore2] = useState('')
++  const [error, setError] = useState<string | null>(null)
++  const playable = match.player1_id && match.player2_id && !match.winner_id
++  const bye = match.player1_id && !match.player2_id && match.winner_id
++
++  async function handleSubmit(event: FormEvent) {
++    event.preventDefault()
++    setError(null)
++    try {
++      await onPlay(match.id, Number.parseInt(score1, 10), Number.parseInt(score2, 10))
++    } catch (err) {
++      setError(err instanceof Error ? err.message : 'Could not record the result.')
++    }
++  }
++
++  const row = (id: string | null, fallback: string) => (
++    <p className={`truncate text-sm ${id && id === match.winner_id ? 'font-semibold text-gold' : 'text-cream'}`}>
++      {nameOf(id) ?? fallback}
++    </p>
++  )
++
++  return (
++    <div className="rounded-lg border border-white/10 bg-felt-950/60 p-2.5">
++      {row(match.player1_id, 'TBD')}
++      {row(match.player2_id, bye ? 'bye' : 'TBD')}
++      {playable ? (
++        <form onSubmit={(event) => void handleSubmit(event)} className="mt-2 flex items-center gap-1.5">
++          <input aria-label="Score player 1" type="number" min={0} value={score1} onChange={(e) => setScore1(e.target.value)} className="w-12 rounded border border-white/10 bg-felt-900 px-1.5 py-1 text-sm text-cream" />
++          <input aria-label="Score player 2" type="number" min={0} value={score2} onChange={(e) => setScore2(e.target.value)} className="w-12 rounded border border-white/10 bg-felt-900 px-1.5 py-1 text-sm text-cream" />
++          <button type="submit" disabled={score1 === '' || score2 === ''} className="rounded bg-cream px-2 py-1 text-xs font-semibold text-felt-950 disabled:opacity-50">
++            Save
++          </button>
++        </form>
++      ) : null}
++      {error ? <p className="mt-1 text-xs text-rod-red">{error}</p> : null}
++    </div>
++  )
++}
+diff --git a/src/lib/api.ts b/src/lib/api.ts
+index 1b1c18a..ff91310 100644
+--- a/src/lib/api.ts
++++ b/src/lib/api.ts
+@@ -1,6 +1,6 @@
+ const INITIAL_ELO = 1500
+ import { supabase } from './supabase'
+-import type { Match, Player, Season } from './types'
++import type { Match, Player, Season, Tournament, TournamentMatch } from './types'
+ 
+ function messageFor(error: { code?: string; message: string }, fallback: string): string {
+   if (error.code === '23505') return 'A player with that name already exists.'
+@@ -81,3 +81,61 @@ export async function closeSeason(seasonId: string, nextName: string): Promise<S
+   if (!data) throw new Error('Could not close the season.')
+   return data as Season
+ }
++
++export async function listTournaments(): Promise<Tournament[]> {
++  const { data, error } = await supabase
++    .from('kl_tournaments')
++    .select('*')
++    .order('created_at', { ascending: false })
++
++  if (error) throw new Error(messageFor(error, 'Could not load tournaments.'))
++  return data ?? []
++}
++
++export async function listTournamentMatches(tournamentId: string): Promise<TournamentMatch[]> {
++  const { data, error } = await supabase
++    .from('kl_tournament_matches')
++    .select('*')
++    .eq('tournament_id', tournamentId)
++    .order('round', { ascending: true })
++    .order('slot', { ascending: true })
++
++  if (error) throw new Error(messageFor(error, 'Could not load the bracket.'))
++  return data ?? []
++}
++
++export async function createTournament(name: string, playerIds: string[]): Promise<Tournament> {
++  const trimmed = name.trim()
++  if (!trimmed) throw new Error('Enter a name for the tournament.')
++  if (playerIds.length < 2) throw new Error('Pick at least two players.')
++
++  const { data, error } = await supabase.rpc('kl_create_tournament', {
++    p_name: trimmed,
++    p_player_ids: playerIds,
++  })
++
++  if (error) throw new Error(messageFor(error, 'Could not create the tournament.'))
++  if (!data) throw new Error('Could not create the tournament.')
++  return data as Tournament
++}
++
++export async function playTournamentMatch(
++  matchId: string,
++  score1: number,
++  score2: number,
++): Promise<TournamentMatch> {
++  if (!Number.isInteger(score1) || !Number.isInteger(score2) || score1 < 0 || score2 < 0) {
++    throw new Error('Scores must be whole numbers of 0 or more.')
++  }
++  if (score1 === score2) throw new Error('A knockout match cannot end in a draw.')
++
++  const { data, error } = await supabase.rpc('kl_play_tournament_match', {
++    p_match_id: matchId,
++    p_score1: score1,
++    p_score2: score2,
++  })
++
++  if (error) throw new Error(messageFor(error, 'Could not record the result.'))
++  if (!data) throw new Error('Could not record the result.')
++  return data as TournamentMatch
++}
+diff --git a/src/lib/bracket.test.ts b/src/lib/bracket.test.ts
+new file mode 100644
+index 0000000..33cc636
+--- /dev/null
++++ b/src/lib/bracket.test.ts
+@@ -0,0 +1,36 @@
++import { describe, expect, it } from 'vitest'
++import { roundCount, roundLabel, seedOrder } from './bracket'
++
++describe('seedOrder', () => {
++  it('returns the standard order for powers of two', () => {
++    expect(seedOrder(2)).toEqual([1, 2])
++    expect(seedOrder(4)).toEqual([1, 4, 2, 3])
++    expect(seedOrder(8)).toEqual([1, 8, 4, 5, 2, 7, 3, 6])
++  })
++
++  it('keeps seeds 1 and 2 in different halves', () => {
++    const order = seedOrder(32)
++    expect(order.indexOf(1)).toBeLessThan(16)
++    expect(order.indexOf(2)).toBeGreaterThanOrEqual(16)
++  })
++
++  it('throws for sizes that are no power of two', () => {
++    expect(() => seedOrder(6)).toThrow()
++    expect(() => seedOrder(1)).toThrow()
++    expect(() => seedOrder(0)).toThrow()
++  })
++})
++
++describe('roundCount and roundLabel', () => {
++  it('counts rounds', () => {
++    expect(roundCount(2)).toBe(1)
++    expect(roundCount(16)).toBe(4)
++  })
++
++  it('names the last three rounds', () => {
++    expect(roundLabel(4, 4)).toBe('Final')
++    expect(roundLabel(3, 4)).toBe('Semi-final')
++    expect(roundLabel(2, 4)).toBe('Quarter-final')
++    expect(roundLabel(1, 4)).toBe('Round 1')
++  })
++})
+diff --git a/src/lib/bracket.ts b/src/lib/bracket.ts
+new file mode 100644
+index 0000000..af23a38
+--- /dev/null
++++ b/src/lib/bracket.ts
+@@ -0,0 +1,28 @@
++// Pure helpers for the knockout bracket (specs/tournament-mode.md).
++
++// Standard seed order: order(2) = [1, 2]; order(2m) replaces every s in
++// order(m) by s, 2m + 1 - s. Seeds 1 and 2 can only meet in the final.
++export function seedOrder(size: number): number[] {
++  if (!Number.isInteger(size) || size < 2 || (size & (size - 1)) !== 0) {
++    throw new Error(`Bracket size must be a power of two of at least 2, got ${size}.`)
++  }
++  let order = [1, 2]
++  while (order.length < size) {
++    const m = order.length
++    order = order.flatMap((s) => [s, 2 * m + 1 - s])
++  }
++  return order
++}
++
++export function roundCount(size: number): number {
++  return Math.log2(seedOrder(size).length)
++}
++
++// Label of a round counted from 1, given the number of rounds.
++export function roundLabel(round: number, rounds: number): string {
++  const fromEnd = rounds - round
++  if (fromEnd === 0) return 'Final'
++  if (fromEnd === 1) return 'Semi-final'
++  if (fromEnd === 2) return 'Quarter-final'
++  return `Round ${round}`
++}
+diff --git a/src/lib/league.ts b/src/lib/league.ts
+index 9c795fc..945d0e4 100644
+--- a/src/lib/league.ts
++++ b/src/lib/league.ts
+@@ -1,12 +1,20 @@
+-import { listMatches, listPlayers } from './api'
+-import type { Match, Player } from './types'
++import { listMatches, listPlayers, listTournamentMatches, listTournaments } from './api'
++import type { Match, Player, Tournament, TournamentMatch } from './types'
+ 
+ export type LeagueData = {
+   players: Player[]
+   matches: Match[]
++  tournament: Tournament | null
++  bracket: TournamentMatch[]
+ }
+ 
+ export async function leagueLoader(): Promise<LeagueData> {
+-  const [players, matches] = await Promise.all([listPlayers(), listMatches()])
+-  return { players, matches }
++  const [players, matches, tournaments] = await Promise.all([
++    listPlayers(),
++    listMatches(),
++    listTournaments(),
++  ])
++  const tournament = tournaments[0] ?? null
++  const bracket = tournament ? await listTournamentMatches(tournament.id) : []
++  return { players, matches, tournament, bracket }
+ }
+diff --git a/src/lib/types.ts b/src/lib/types.ts
+index 4b72048..d734bc1 100644
+--- a/src/lib/types.ts
++++ b/src/lib/types.ts
+@@ -43,3 +43,24 @@ export type SeasonStanding = {
+   draws: number
+   losses: number
+ }
++
++export type Tournament = {
++  id: string
++  season_id: string
++  name: string
++  size: number
++  created_at: string
++  finished_at: string | null
++  champion_id: string | null
++}
++
++export type TournamentMatch = {
++  id: string
++  tournament_id: string
++  round: number
++  slot: number
++  player1_id: string | null
++  player2_id: string | null
++  winner_id: string | null
++  match_id: string | null
++}
+diff --git a/supabase/migrations/0003_tournaments.sql b/supabase/migrations/0003_tournaments.sql
+new file mode 100644
+index 0000000..d31cba3
+--- /dev/null
++++ b/supabase/migrations/0003_tournaments.sql
+@@ -0,0 +1,225 @@
++-- Tournament mode: knockout brackets on top of the league.
++-- Spec: specs/tournament-mode.md (reference solution for lecture 8).
++
++create table if not exists kl_tournaments (
++  id uuid primary key default gen_random_uuid(),
++  season_id uuid not null references kl_seasons (id),
++  name text not null,
++  size integer not null,
++  created_at timestamptz not null default now(),
++  finished_at timestamptz,
++  champion_id uuid references kl_players (id),
++  constraint kl_tournaments_name_not_blank check (char_length(trim(name)) > 0),
++  constraint kl_tournaments_size_power_of_two check (size in (2, 4, 8, 16, 32))
++);
++
++create table if not exists kl_tournament_entries (
++  tournament_id uuid not null references kl_tournaments (id),
++  player_id uuid not null references kl_players (id),
++  seed integer not null,
++  primary key (tournament_id, player_id),
++  unique (tournament_id, seed)
++);
++
++create table if not exists kl_tournament_matches (
++  id uuid primary key default gen_random_uuid(),
++  tournament_id uuid not null references kl_tournaments (id),
++  round integer not null,
++  slot integer not null,
++  player1_id uuid references kl_players (id),
++  player2_id uuid references kl_players (id),
++  winner_id uuid references kl_players (id),
++  match_id uuid references kl_matches (id),
++  unique (tournament_id, round, slot)
++);
++
++alter table kl_tournaments enable row level security;
++alter table kl_tournament_entries enable row level security;
++alter table kl_tournament_matches enable row level security;
++
++create policy kl_tournaments_select on kl_tournaments
++  for select to anon, authenticated using (true);
++create policy kl_tournament_entries_select on kl_tournament_entries
++  for select to anon, authenticated using (true);
++create policy kl_tournament_matches_select on kl_tournament_matches
++  for select to anon, authenticated using (true);
++
++grant select on table kl_tournaments to anon, authenticated;
++grant select on table kl_tournament_entries to anon, authenticated;
++grant select on table kl_tournament_matches to anon, authenticated;
++
++-- Puts a winner into the next round (spec: "Advancing"). After the final it
++-- closes the tournament instead. Internal helper, not executable by clients.
++create or replace function kl_tournament_advance(
++  p_tournament_id uuid,
++  p_round integer,
++  p_slot integer,
++  p_winner_id uuid
++)
++returns void
++language plpgsql
++security definer
++set search_path = public
++as $$
++declare
++  rounds integer;
++begin
++  select round(log(2, size))::integer into rounds from kl_tournaments where id = p_tournament_id;
++
++  if p_round >= rounds then
++    update kl_tournaments
++      set finished_at = now(), champion_id = p_winner_id
++      where id = p_tournament_id;
++    return;
++  end if;
++
++  if p_slot % 2 = 1 then
++    update kl_tournament_matches set player1_id = p_winner_id
++      where tournament_id = p_tournament_id and round = p_round + 1 and slot = (p_slot + 1) / 2;
++  else
++    update kl_tournament_matches set player2_id = p_winner_id
++      where tournament_id = p_tournament_id and round = p_round + 1 and slot = p_slot / 2;
++  end if;
++end;
++$$;
++
++revoke all on function kl_tournament_advance(uuid, integer, integer, uuid) from public, anon, authenticated;
++
++create or replace function kl_create_tournament(p_name text, p_player_ids uuid[])
++returns kl_tournaments
++language plpgsql
++security definer
++set search_path = public
++as $$
++declare
++  n integer := coalesce(cardinality(p_player_ids), 0);
++  bracket integer := 2;
++  rounds integer;
++  season_id_open uuid;
++  seed_order integer[] := array[1, 2];
++  next_order integer[];
++  s integer;
++  r integer;
++  k integer;
++  seed_a integer;
++  seed_b integer;
++  p1 uuid;
++  p2 uuid;
++  result kl_tournaments;
++begin
++  if p_name is null or char_length(trim(p_name)) = 0 then
++    raise exception 'Enter a name for the tournament.';
++  end if;
++  if n < 2 or n > 32 then
++    raise exception 'A tournament needs 2 to 32 players.';
++  end if;
++  if (select count(distinct id) from unnest(p_player_ids) as id) <> n then
++    raise exception 'A player appears twice.';
++  end if;
++  if (select count(*) from kl_players where id = any (p_player_ids)) <> n then
++    raise exception 'One of the players is missing.';
++  end if;
++
++  select id into season_id_open from kl_seasons where closed_at is null for share;
++  if season_id_open is null then
++    raise exception 'There is no open season.';
++  end if;
++
++  while bracket < n loop
++    bracket := bracket * 2;
++  end loop;
++  rounds := round(log(2, bracket))::integer;
++
++  insert into kl_tournaments (season_id, name, size)
++    values (season_id_open, trim(p_name), bracket)
++    returning * into result;
++
++  insert into kl_tournament_entries (tournament_id, player_id, seed)
++  select result.id, p.id, row_number() over (order by p.elo desc, lower(p.name) asc, p.id)::integer
++    from kl_players p
++    where p.id = any (p_player_ids);
++
++  -- Every match of every round; later rounds start empty.
++  for r in 1..rounds loop
++    insert into kl_tournament_matches (tournament_id, round, slot)
++    select result.id, r, slot from generate_series(1, bracket / (2 ^ r)::integer) as slot;
++  end loop;
++
++  -- Standard seed order: order(2m) replaces every s in order(m) by s, 2m + 1 - s.
++  while cardinality(seed_order) < bracket loop
++    next_order := array[]::integer[];
++    foreach s in array seed_order loop
++      next_order := next_order || s || (2 * cardinality(seed_order) + 1 - s);
++    end loop;
++    seed_order := next_order;
++  end loop;
++
++  for k in 1..(bracket / 2) loop
++    seed_a := seed_order[2 * k - 1];
++    seed_b := seed_order[2 * k];
++    select player_id into p1 from kl_tournament_entries where tournament_id = result.id and seed = seed_a;
++    p2 := null;
++    if seed_b <= n then
++      select player_id into p2 from kl_tournament_entries where tournament_id = result.id and seed = seed_b;
++    end if;
++
++    update kl_tournament_matches
++      set player1_id = p1, player2_id = p2, winner_id = case when p2 is null then p1 end
++      where tournament_id = result.id and round = 1 and slot = k;
++
++    if p2 is null then
++      perform kl_tournament_advance(result.id, 1, k, p1);
++    end if;
++  end loop;
++
++  return result;
++end;
++$$;
++
++revoke all on function kl_create_tournament(text, uuid[]) from public;
++grant execute on function kl_create_tournament(text, uuid[]) to anon, authenticated;
++
++create or replace function kl_play_tournament_match(
++  p_match_id uuid,
++  p_score1 integer,
++  p_score2 integer
++)
++returns kl_tournament_matches
++language plpgsql
++security definer
++set search_path = public
++as $$
++declare
++  tm kl_tournament_matches;
++  league kl_matches;
++  winner uuid;
++begin
++  select * into tm from kl_tournament_matches where id = p_match_id for update;
++  if tm.id is null then
++    raise exception 'Tournament match not found.';
++  end if;
++  if tm.winner_id is not null then
++    raise exception 'This match has already been played.';
++  end if;
++  if tm.player1_id is null or tm.player2_id is null then
++    raise exception 'This match is not ready: a player is still missing.';
++  end if;
++  if p_score1 = p_score2 then
++    raise exception 'A knockout match cannot end in a draw.';
++  end if;
++
++  league := kl_record_match(tm.player1_id, tm.player2_id, p_score1, p_score2);
++  winner := case when p_score1 > p_score2 then tm.player1_id else tm.player2_id end;
++
++  update kl_tournament_matches
++    set winner_id = winner, match_id = league.id
++    where id = tm.id
++    returning * into tm;
++
++  perform kl_tournament_advance(tm.tournament_id, tm.round, tm.slot, winner);
++  return tm;
++end;
++$$;
++
++revoke all on function kl_play_tournament_match(uuid, integer, integer) from public;
++grant execute on function kl_play_tournament_match(uuid, integer, integer) to anon, authenticated;

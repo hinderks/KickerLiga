@@ -1,0 +1,68 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "model": "openrouter/qwen/qwen3.8-27b",
+  "provider": {
+    "openrouter": {
+      "models": {
+        "qwen/qwen3.8-27b": {
+          "options": {
+            "provider": {
+              "order": [
+                "Alibaba"
+              ],
+              "allow_fallbacks": false
+            }
+          }
+        }
+      }
+    }
+  },
+  "permission": {
+    "read": {
+      "*": "allow",
+      "*.env": "deny",
+      "*.env.*": "deny",
+      "*.env.example": "allow",
+      "*.env.demo.example": "allow"
+    },
+    "edit": {
+      "*": "allow",
+      "tests/acceptance/*": "deny",
+      "vite.config.ts": "deny",
+      "vitest.acceptance.config.ts": "deny",
+      "eslint.config.js": "deny",
+      "tsconfig*.json": "deny",
+      "package.json": "deny",
+      "package-lock.json": "deny",
+      "scripts/*": "deny",
+      "supabase/seed.sql": "deny",
+      "supabase/config.toml": "deny",
+      "AGENTS.md": "deny",
+      "opencode.json": "deny",
+      ".opencode/*": "deny",
+      "*.env*": "deny"
+    },
+    "bash": {
+      "*": "ask",
+      "npm test": "allow",
+      "npm run typecheck": "allow",
+      "npm run lint": "allow",
+      "npm run build": "allow",
+      "git status *": "allow",
+      "git diff *": "allow",
+      "git log *": "allow",
+      "git commit *": "deny",
+      "git push *": "deny"
+    },
+    "external_directory": "deny",
+    "describe_table": "allow",
+    "run_migrations": "allow",
+    "seed_db": "allow",
+    "run_tests": "allow"
+  },
+  "agent": {
+    "build": {
+      "steps": 40
+    }
+  }
+}

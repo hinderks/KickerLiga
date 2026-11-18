@@ -16,6 +16,7 @@ export type Match = {
   player1_elo_after: number
   player2_elo_after: number
   played_at: string
+  season_id: string
 }
 
 export type PlayerRecord = {
@@ -23,4 +24,22 @@ export type PlayerRecord = {
   losses: number
   draws: number
   played: number
+}
+
+export type Season = {
+  id: string
+  name: string
+  started_at: string
+  closed_at: string | null
+}
+
+export type SeasonStanding = {
+  season_id: string
+  player_id: string
+  rank: number
+  elo: number
+  played: number
+  wins: number
+  draws: number
+  losses: number
 }

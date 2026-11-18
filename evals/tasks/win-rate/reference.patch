@@ -1,0 +1,28 @@
+diff --git a/src/lib/stats.test.ts b/src/lib/stats.test.ts
+new file mode 100644
+index 0000000..68f58a4
+--- /dev/null
++++ b/src/lib/stats.test.ts
+@@ -0,0 +1,9 @@
++import { describe, expect, it } from 'vitest'
++import { winRate } from './stats'
++
++describe('winRate', () => {
++  it('counts draws as half a win and rounds to three decimals', () => {
++    expect(winRate({ wins: 0, losses: 0, draws: 0, played: 0 })).toBe(0)
++    expect(winRate({ wins: 2, losses: 3, draws: 2, played: 7 })).toBe(0.429)
++  })
++})
+diff --git a/src/lib/stats.ts b/src/lib/stats.ts
+index ee37de3..e69b656 100644
+--- a/src/lib/stats.ts
++++ b/src/lib/stats.ts
+@@ -31,3 +31,8 @@ export function formatDelta(after: number, before: number): string {
+   if (delta < 0) return String(delta)
+   return '0'
+ }
++
++export function winRate(record: PlayerRecord): number {
++  if (record.played === 0) return 0
++  return Math.round(((record.wins + record.draws / 2) / record.played) * 1000) / 1000
++}

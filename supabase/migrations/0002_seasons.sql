@@ -1,0 +1,184 @@
+-- Seasons: closing a season freezes its final ranking and starts the next one.
+-- Spec: specs/season-close.md (reference solution for lecture 7).
+
+create table if not exists kl_seasons (
+  id uuid primary key default gen_random_uuid(),
+  name text not null,
+  started_at timestamptz not null default now(),
+  closed_at timestamptz,
+  constraint kl_seasons_name_not_blank check (char_length(trim(name)) > 0)
+);
+
+-- At most one open season.
+create unique index if not exists kl_seasons_one_open on kl_seasons ((true)) where closed_at is null;
+
+insert into kl_seasons (name) values ('Season 1');
+
+alter table kl_matches add column if not exists season_id uuid references kl_seasons (id);
+update kl_matches
+  set season_id = (select id from kl_seasons where name = 'Season 1')
+  where season_id is null;
+alter table kl_matches alter column season_id set not null;
+create index if not exists kl_matches_season_idx on kl_matches (season_id);
+
+create table if not exists kl_season_standings (
+  season_id uuid not null references kl_seasons (id),
+  player_id uuid not null references kl_players (id),
+  rank integer not null,
+  elo integer not null,
+  played integer not null,
+  wins integer not null,
+  draws integer not null,
+  losses integer not null,
+  primary key (season_id, player_id)
+);
+
+alter table kl_seasons enable row level security;
+alter table kl_season_standings enable row level security;
+
+create policy kl_seasons_select on kl_seasons
+  for select to anon, authenticated using (true);
+create policy kl_season_standings_select on kl_season_standings
+  for select to anon, authenticated using (true);
+
+grant select on table kl_seasons to anon, authenticated;
+grant select on table kl_season_standings to anon, authenticated;
+
+-- Same signature and behaviour as in 0001, plus the open season.
+create or replace function kl_record_match(
+  p_player1_id uuid,
+  p_player2_id uuid,
+  p_score1 integer,
+  p_score2 integer
+)
+returns kl_matches
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  r1 kl_players;
+  r2 kl_players;
+  season_id_open uuid;
+  expected1 numeric;
+  actual1 numeric;
+  new1 integer;
+  new2 integer;
+  result kl_matches;
+begin
+  if p_player1_id = p_player2_id then
+    raise exception 'Pick two different players.';
+  end if;
+  if p_score1 < 0 or p_score2 < 0 then
+    raise exception 'Scores must be whole numbers of 0 or more.';
+  end if;
+
+  -- for share: a season close waits until this match is stored.
+  select id into season_id_open from kl_seasons where closed_at is null for share;
+  if season_id_open is null then
+    raise exception 'There is no open season.';
+  end if;
+
+  select * into r1 from kl_players where id = p_player1_id for update;
+  if r1.id is null then
+    raise exception 'One of the players is missing.';
+  end if;
+
+  select * into r2 from kl_players where id = p_player2_id for update;
+  if r2.id is null then
+    raise exception 'One of the players is missing.';
+  end if;
+
+  expected1 := 1 / (1 + power(10::numeric, (r2.elo - r1.elo)::numeric / 400));
+  if p_score1 > p_score2 then
+    actual1 := 1;
+  elsif p_score1 < p_score2 then
+    actual1 := 0;
+  else
+    actual1 := 0.5;
+  end if;
+
+  new1 := round(r1.elo + 32 * (actual1 - expected1));
+  new2 := round(r2.elo + 32 * ((1 - actual1) - (1 - expected1)));
+
+  insert into kl_matches (
+    player1_id, player2_id, score1, score2,
+    player1_elo_before, player2_elo_before, player1_elo_after, player2_elo_after,
+    season_id
+  ) values (
+    p_player1_id, p_player2_id, p_score1, p_score2,
+    r1.elo, r2.elo, new1, new2,
+    season_id_open
+  )
+  returning * into result;
+
+  update kl_players set elo = new1 where id = p_player1_id;
+  update kl_players set elo = new2 where id = p_player2_id;
+
+  return result;
+end;
+$$;
+
+create or replace function kl_close_season(p_season_id uuid, p_next_name text)
+returns kl_seasons
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  season kl_seasons;
+  next_season kl_seasons;
+begin
+  if p_next_name is null or char_length(trim(p_next_name)) = 0 then
+    raise exception 'Enter a name for the next season.';
+  end if;
+
+  select * into season from kl_seasons where id = p_season_id for update;
+  if season.id is null then
+    raise exception 'Season not found.';
+  end if;
+  if season.closed_at is not null then
+    raise exception 'Season is already closed.';
+  end if;
+
+  insert into kl_season_standings (season_id, player_id, rank, elo, played, wins, draws, losses)
+  select
+    p_season_id,
+    counts.player_id,
+    row_number() over (order by p.elo desc, counts.wins desc, lower(p.name) asc, p.id)::integer,
+    p.elo,
+    counts.played,
+    counts.wins,
+    counts.draws,
+    counts.losses
+  from (
+    select
+      player_id,
+      count(*)::integer as played,
+      count(*) filter (where own > other)::integer as wins,
+      count(*) filter (where own = other)::integer as draws,
+      count(*) filter (where own < other)::integer as losses
+    from (
+      select player1_id as player_id, score1 as own, score2 as other
+        from kl_matches where season_id = p_season_id
+      union all
+      select player2_id, score2, score1
+        from kl_matches where season_id = p_season_id
+    ) as sides
+    group by player_id
+  ) as counts
+  join kl_players p on p.id = counts.player_id;
+
+  update kl_seasons set closed_at = now() where id = p_season_id;
+
+  -- numeric division and round: half away from zero, as the spec requires.
+  -- "where true" keeps the update valid where updates without WHERE are blocked.
+  update kl_players set elo = round(1500 + (elo - 1500) / 2.0) where true;
+
+  insert into kl_seasons (name) values (trim(p_next_name)) returning * into next_season;
+  return next_season;
+end;
+$$;
+
+revoke all on function kl_close_season(uuid, text) from public;
+grant execute on function kl_close_season(uuid, text) to anon, authenticated;

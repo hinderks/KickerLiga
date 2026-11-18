@@ -1,6 +1,6 @@
-import { INITIAL_ELO } from './elo'
+const INITIAL_ELO = 1500
 import { supabase } from './supabase'
-import type { Match, Player } from './types'
+import type { Match, Player, Season } from './types'
 
 function messageFor(error: { code?: string; message: string }, fallback: string): string {
   if (error.code === '23505') return 'A player with that name already exists.'
@@ -66,4 +66,18 @@ export async function recordMatch(
   if (error) throw new Error(messageFor(error, 'Could not record match.'))
   if (!data) throw new Error('Could not record match.')
   return data as Match
+}
+
+export async function closeSeason(seasonId: string, nextName: string): Promise<Season> {
+  const name = nextName.trim()
+  if (!name) throw new Error('Enter a name for the next season.')
+
+  const { data, error } = await supabase.rpc('kl_close_season', {
+    p_season_id: seasonId,
+    p_next_name: name,
+  })
+
+  if (error) throw new Error(messageFor(error, 'Could not close the season.'))
+  if (!data) throw new Error('Could not close the season.')
+  return data as Season
 }

@@ -1,0 +1,51 @@
+diff --git a/src/lib/api.ts b/src/lib/api.ts
+index 1b1c18a..86f4cb9 100644
+--- a/src/lib/api.ts
++++ b/src/lib/api.ts
+@@ -81,3 +81,11 @@ export async function closeSeason(seasonId: string, nextName: string): Promise<S
+   if (!data) throw new Error('Could not close the season.')
+   return data as Season
+ }
++
++export async function undoLastMatch(): Promise<Match> {
++  const { data, error } = await supabase.rpc('kl_undo_last_match')
++
++  if (error) throw new Error(messageFor(error, 'Could not undo the last match.'))
++  if (!data) throw new Error('Could not undo the last match.')
++  return data as Match
++}
+diff --git a/supabase/migrations/0003_undo_last_match.sql b/supabase/migrations/0003_undo_last_match.sql
+new file mode 100644
+index 0000000..77dd7db
+--- /dev/null
++++ b/supabase/migrations/0003_undo_last_match.sql
+@@ -0,0 +1,29 @@
++-- Undo the latest match of the open season (eval reference).
++
++create or replace function kl_undo_last_match()
++returns kl_matches
++language plpgsql
++security definer
++set search_path = public
++as $$
++declare
++  last kl_matches;
++begin
++  select m.* into last
++    from kl_matches m join kl_seasons s on s.id = m.season_id
++    where s.closed_at is null
++    order by m.played_at desc, m.id desc
++    limit 1
++    for update of m;
++  if last.id is null then
++    raise exception 'There is no match in the open season.';
++  end if;
++  update kl_players set elo = last.player1_elo_before where id = last.player1_id;
++  update kl_players set elo = last.player2_elo_before where id = last.player2_id;
++  delete from kl_matches where id = last.id;
++  return last;
++end;
++$$;
++
++revoke all on function kl_undo_last_match() from public;
++grant execute on function kl_undo_last_match() to anon, authenticated;

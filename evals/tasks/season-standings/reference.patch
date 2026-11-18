@@ -1,0 +1,40 @@
+diff --git a/src/lib/api.ts b/src/lib/api.ts
+index 1b1c18a..28cae85 100644
+--- a/src/lib/api.ts
++++ b/src/lib/api.ts
+@@ -1,6 +1,6 @@
+ const INITIAL_ELO = 1500
+ import { supabase } from './supabase'
+-import type { Match, Player, Season } from './types'
++import type { Match, Player, Season, SeasonStandingRow } from './types'
+ 
+ function messageFor(error: { code?: string; message: string }, fallback: string): string {
+   if (error.code === '23505') return 'A player with that name already exists.'
+@@ -81,3 +81,17 @@ export async function closeSeason(seasonId: string, nextName: string): Promise<S
+   if (!data) throw new Error('Could not close the season.')
+   return data as Season
+ }
++
++export async function listSeasonStandings(seasonId: string): Promise<SeasonStandingRow[]> {
++  const { data, error } = await supabase
++    .from('kl_season_standings')
++    .select('*, kl_players(name)')
++    .eq('season_id', seasonId)
++    .order('rank', { ascending: true })
++
++  if (error) throw new Error(messageFor(error, 'Could not load standings.'))
++  return (data ?? []).map(({ kl_players, ...row }) => ({
++    ...row,
++    name: (kl_players as { name: string } | null)?.name ?? '',
++  }))
++}
+diff --git a/src/lib/types.ts b/src/lib/types.ts
+index 4b72048..3190dbf 100644
+--- a/src/lib/types.ts
++++ b/src/lib/types.ts
+@@ -43,3 +43,5 @@ export type SeasonStanding = {
+   draws: number
+   losses: number
+ }
++
++export type SeasonStandingRow = SeasonStanding & { name: string }

@@ -1,0 +1,1 @@
+src/scratch/addElo.ts(1,10): error TS2305: Module '"@supabase/supabase-js"' has no exported member 'sql'.
